@@ -1,9 +1,15 @@
-let Px = [];
-let Py = [];
-let Pz = [];
-const degree = 3
-const internalKnots = []
-let knots = []
+let grid_size = 20
+let Positions = [
+  [
+    [0, 0, 0], [-1, 0, 0],
+  ], 
+  [
+    [0, -1, 0], [-1, -1, 0],
+  ],
+  [
+    [0, -1, -1], [-1, -1, -1],
+  ]
+];
 
 function memo(f) {
   cache = {}
@@ -47,245 +53,36 @@ function surface(P, u, v) {
   return result
 }
 
-function resetKnots() {
-  knots = []
-  for (let i = 0; i < degree + 1; i++) {
-    knots.push(0)
-  }
-  for (let i = 0; i < internalKnots.length; i++) {
-    knots.push(internalKnots[i])
-  }
-  for (let i = 0; i < degree + 1; i++) {
-    knots.push(1)
-  }
-}
-
-resetKnots()
-const vertexCount = 100;
-
-main();
-
-function getRelativeMousePosition(event, target) {
-  target = target || event.target;
-  var rect = target.getBoundingClientRect();
-
-  return {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top,
-  }
-}
-
-// assumes target or event.target is canvas
-function getNoPaddingNoBorderCanvasRelativeMousePosition(event, target) {
-  target = target || event.target;
-  var pos = getRelativeMousePosition(event, target);
-
-  pos.x = pos.x * target.width / target.clientWidth;
-  pos.y = pos.y * target.height / target.clientHeight;
-
-  pos.x = +1 * (pos.x / 320 - 1)
-  pos.y = -1 * (pos.y / 320 - 1)
-  return pos;
-}
-
-
-function reloadSliders() {
-  document.getElementById("debug-data").innerText = `Px=${Px} Py=${Py} Knots=${knots}`
-
-  let elem = document.getElementById("knot")
-  elem.innerHTML = ''
-  for (let i = 0; i < knots.length; i++) {
-    let disabled = Math.min(i, knots.length - i - 1) <= degree
-    let child = document.createElement("div")
-    child.innerHTML = `
-        <label for=\"myRange\">Knot ${i}: </label>
-        <input ${disabled ? "disabled" : ""} type=\"range\" min=\"1\" max=\"100\" value=\"${100 * knots[i]}\" class=\"slider\" id=\"myRange\">`
-    child.children[1].addEventListener("click", function (event) {
-      console.log(`knots-${i} - ${event.target.value}`)
-      let value = Number(event.target.value) / 100
-      if (knots[i - 1] < value && value < knots[i + 1]) {
-        internalKnots[i - degree - 1] = value
-        resetKnots()
-      } else {
-        event.target.value = knots[i] * 100
-      }
-    })
-    elem.appendChild(child)
-  }
-}
-
-reloadSliders()
-//
-// Start here
-//
-function main() {
-  const canvas = document.querySelector('#glcanvas');
-  const gl = canvas.getContext('webgl');
-  canvas.addEventListener('click', e => {
-
-    const pos = getNoPaddingNoBorderCanvasRelativeMousePosition(e, gl.canvas);
-    console.log(pos)
-    if (Px.length >= degree + 1) {
-      if (internalKnots.length > 0) {
-        internalKnots.push(internalKnots[internalKnots.length - 1])
-      } else {
-        internalKnots.push(0.5)
-      }
+function makePositions(P) {
+  let positions = []
+  for (let i = 0; i < grid_size; i++) {
+    for (let j = 0; j < grid_size; j++) {
+      positions.push(surface(P, i/(grid_size-1), j/(grid_size-1)))
     }
-    console.log("Dastan:")
-    resetKnots()
-    console.log(internalKnots)
-    console.log(knots)
-    Px.push(pos.x)
-    Py.push(pos.y)
-    reloadSliders()
-  })
-
-  // If we don't have a GL context, give up now
-
-  if (!gl) {
-    alert('Unable to initialize WebGL. Your browser or machine may not support it.');
-    return;
   }
+  return positions
+}
 
-  // Vertex shader program
-
-  const vsSource = `
-    attribute vec4 aVertexPosition;
-
-    uniform mat4 uModelViewMatrix;
-    uniform mat4 uProjectionMatrix;
-
-    void main() {
-      gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+function makeTriangles(P) {
+  let triangle = []
+  for (let i = 0; i < grid_size-1; i++) {
+    for (let j = 0; j < grid_size-1; j++) {
+      triangle.push(i*grid_size + j)
+      triangle.push(i*grid_size + j+1)
+      triangle.push((i+1)*grid_size + j)
+      triangle.push((i+1)*grid_size + j)
+      triangle.push(i*grid_size + j+1)
+      triangle.push((i+1)*grid_size + j+1)
     }
-  `;
-
-  // Fragment shader program
-
-  const fsSource = `
-    void main() {
-      gl_FragColor = vec4(0, 0, 0, 1.0);
-    }
-  `;
-
-  // Initialize a shader program; this is where all the lighting
-  // for the vertices and so forth is established.
-  const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
-
-  // Collect all the info needed to use the shader program.
-  // Look up which attribute our shader program is using
-  // for aVertexPosition and look up uniform locations.
-  const programInfo = {
-    program: shaderProgram,
-    attribLocations: {
-      vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
-    },
-    uniformLocations: {
-      projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
-      modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
-    },
-  };
-
-  // Here's where we call the routine that builds all the
-  // objects we'll be drawing.
-
-  function draw() {
-    const buffers = initBuffers(gl);
-
-    // Draw the scene
-    drawScene(gl, programInfo, buffers);
   }
-
-  setInterval(draw, 1000);
-  draw()
-}
-
-function safeDivision(a, b) {
-  /// Acording to definition of N function
-  if (b === 0)
-    return 0
-  else
-    return a / b
-}
-
-function N(i, j, t) {
-  if (j === 0) {
-    if (knots[i] <= t && t < knots[i + 1])
-      return 1
-    else
-      return 0
-  } else {
-    return (
-      N(i, j - 1, t) * safeDivision(t - knots[i], knots[i + j] - knots[i]) +
-      N(i + 1, j - 1, t) * safeDivision(knots[i + j + 1] - t, knots[i + j + 1] - knots[i + 1])
-    )
-  }
-}
-
-function f(t, points) {
-  const n = points.length - 1
-  if (n < degree)
-    return 0
-  const m = knots.length - 1
-  const p = m - n - 1
-  console.assert(p === degree)
-  let sum = 0
-  for (let i = 0; i < points.length; i++) {
-    sum += points[i] * N(i, p, t)
-  }
-  return sum;
-}
-
-function createPosition() {
-  const positions = [];
-  for (let t = 0.0; t <= 1; t += 0.01) {
-    positions.push(f(t, Px))
-    positions.push(f(t, Py))
-  }
-  return positions;
-}
-
-//
-// initBuffers
-//
-// Initialize the buffers we'll need. For this demo, we just
-// have one object -- a simple two-dimensional square.
-//
-function initBuffers(gl) {
-
-  // Create a buffer for the square's positions.
-
-  const positionBuffer = gl.createBuffer();
-
-  // Select the positionBuffer as the one to apply buffer
-  // operations to from here out.
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-  // Now create an array of positions for the square.
-
-  const positions = createPosition();
-
-  // Now pass the list of positions into WebGL to build the
-  // shape. We do this by creating a Float32Array from the
-  // JavaScript array, then use it to fill the current buffer.
-
-  gl.bufferData(gl.ARRAY_BUFFER,
-    new Float32Array(positions),
-    gl.STATIC_DRAW);
-
-  return {
-    position: positionBuffer,
-  };
+  return triangle
 }
 
 //
 // Draw the scene.
 //
-function drawScene(gl, programInfo, buffers) {
-  gl.clearColor(1.0, 1.0, 1.0, 1.0);  // Clear to black, fully opaque
-  gl.clearColor(1.0, 1.0, 1.0, 1.0);  // Clear to black, fully opaque
+function drawScene(gl, programInfo) {
+  // gl.clearColor(1.0, 1.0, 1.0, 1.0);  // Clear to black, fully opaque
   gl.clearDepth(1.0);                 // Clear everything
   gl.enable(gl.DEPTH_TEST);           // Enable depth testing
   gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
@@ -317,24 +114,48 @@ function drawScene(gl, programInfo, buffers) {
 
   // Set the drawing position to the "identity" point, which is
   // the center of the scene.
-  const modelViewMatrix = mat4.create();
+  const modelMatrix = mat4.create();
+
+  const viewMatrix = mat4.create();
 
   // Now move the drawing position a bit to where we want to
   // start drawing the square.
 
-  mat4.translate(modelViewMatrix,     // destination matrix
-    modelViewMatrix,     // matrix to translate
-    [-0.0, 0.0, -1.0]);  // amount to translate
+  mat4.translate(modelMatrix,     // destination matrix
+    modelMatrix,     // matrix to translate
+    [-0.0, 0.0, -0.0]);  // amount to translate
 
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute.
   {
-    const numComponents = 2;
+    // Create a buffer for the square's positions.
+
+    const positionBuffer = gl.createBuffer();
+
+    // Select the positionBuffer as the one to apply buffer
+    // operations to from here out.
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+    // Now create an array of positions for the square.
+
+    const positions = makePositions(Positions);
+    const triangles = makeTriangles(Positions);
+    // console.log(positions)
+    // console.log(triangles)
+
+    // Now pass the list of positions into WebGL to build the
+    // shape. We do this by creating a Float32Array from the
+    // JavaScript array, then use it to fill the current buffer.
+
+    gl.bufferData(gl.ARRAY_BUFFER,
+      new Float32Array(positions),
+      gl.STATIC_DRAW);
+    const numComponents = 3;
     const type = gl.FLOAT;
     const normalize = false;
     const stride = 0;
     const offset = 0;
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
     gl.vertexAttribPointer(
       programInfo.attribLocations.vertexPosition,
       numComponents,
@@ -344,6 +165,12 @@ function drawScene(gl, programInfo, buffers) {
       offset);
     gl.enableVertexAttribArray(
       programInfo.attribLocations.vertexPosition);
+
+    const elementBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elementBuffer);  
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangles), gl.STATIC_DRAW);
+
+    
   }
 
   // Tell WebGL to use our program when drawing
@@ -357,13 +184,21 @@ function drawScene(gl, programInfo, buffers) {
     false,
     projectionMatrix);
   gl.uniformMatrix4fv(
-    programInfo.uniformLocations.modelViewMatrix,
+    programInfo.uniformLocations.modelMatrix,
     false,
-    modelViewMatrix);
+    modelMatrix);
+  gl.uniformMatrix4fv(
+    programInfo.uniformLocations.viewMatrix,
+    false,
+    viewMatrix);
+  console.log(modelMatrix)
+  console.log(viewMatrix)
+  console.log(projectionMatrix)
+
 
   {
     const offset = 0;
-    gl.drawArrays(gl.LINE_STRIP, offset, vertexCount);
+    gl.drawElements(gl.TRIANGLES, (grid_size-1)*(grid_size-1)*6, gl.UNSIGNED_BYTE, offset);
   }
 }
 
@@ -417,3 +252,140 @@ function loadShader(gl, type, source) {
   return shader;
 }
 
+
+function getRelativeMousePosition(event, target) {
+  target = target || event.target;
+  var rect = target.getBoundingClientRect();
+
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  }
+}
+
+// assumes target or event.target is canvas
+function getNoPaddingNoBorderCanvasRelativeMousePosition(event, target) {
+  target = target || event.target;
+  var pos = getRelativeMousePosition(event, target);
+
+  pos.x = pos.x * target.width / target.clientWidth;
+  pos.y = pos.y * target.height / target.clientHeight;
+
+  pos.x = +1 * (pos.x / 320 - 1)
+  pos.y = -1 * (pos.y / 320 - 1)
+  return pos;
+}
+
+main();
+
+
+//
+//
+// Start here
+//
+function main() {
+  const canvas = document.querySelector('#glcanvas');
+  const gl = canvas.getContext('webgl');
+  // canvas.addEventListener('click', e => {
+
+  //   const pos = getNoPaddingNoBorderCanvasRelativeMousePosition(e, gl.canvas);
+  //   console.log(pos)
+  //   if (Px.length >= degree + 1) {
+  //     if (internalKnots.length > 0) {
+  //       internalKnots.push(internalKnots[internalKnots.length - 1])
+  //     } else {
+  //       internalKnots.push(0.5)
+  //     }
+  //   }
+  //   console.log("Dastan:")
+  //   resetKnots()
+  //   console.log(internalKnots)
+  //   console.log(knots)
+  //   Px.push(pos.x)
+  //   Py.push(pos.y)
+  //   reloadSliders()
+  // })
+
+  // If we don't have a GL context, give up now
+
+  if (!gl) {
+    alert('Unable to initialize WebGL. Your browser or machine may not support it.');
+    return;
+  }
+
+  // Vertex shader program
+
+  const vsSource = `
+    attribute vec3 aPos;
+    
+    uniform mat4 model;
+    uniform mat4 view;
+    uniform mat4 projection;
+    
+    varying vec4 FragPos;
+    
+    void main() {
+        FragPos = model * vec4(aPos, 1.0);
+        gl_Position = projection * view * FragPos;
+    }
+  `;
+
+  // Fragment shader program
+
+  const fsSource = `
+    #ifdef GL_ES
+    precision mediump float;
+    #endif
+    varying vec4 FragPos;
+    
+    varying vec4 fragColor;
+        
+    void main() {
+        //ambinet
+        vec3 lightColor = vec3(1.0, 1.0, 0.0);
+        float ambientStrength = 0.2;
+        vec3 ambientLight = ambientStrength * lightColor;
+    
+    
+        //depth cueing
+        vec3 lightPos = vec3(10.0, 10.0, 10.0);
+        float lightPow = max(1.0 / min(length(distance(lightPos, vec3(FragPos))), 1.0), 1.0);
+        vec3 cueingLight = lightColor * lightPow;
+
+    
+        vec4 fragColor = min(vec4(cueingLight + ambientLight, 1.0), vec4(1.0, 1.0, 1.0, 1.0));
+        fragColor = vec4(1.0, 0.0, 0.0, 1.0);
+        gl_FragColor = fragColor;
+    } 
+  `;
+
+  // Initialize a shader program; this is where all the lighting
+  // for the vertices and so forth is established.
+  const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+
+  // Collect all the info needed to use the shader program.
+  // Look up which attribute our shader program is using
+  // for aVertexPosition and look up uniform locations.
+  const programInfo = {
+    program: shaderProgram,
+    attribLocations: {
+      vertexPosition: gl.getAttribLocation(shaderProgram, 'aPos'),
+    },
+    uniformLocations: {
+      modelMatrix: gl.getUniformLocation(shaderProgram, 'model'),
+      viewMatrix: gl.getUniformLocation(shaderProgram, 'view'),
+      projectionMatrix: gl.getUniformLocation(shaderProgram, 'projection'),
+    },
+  };
+
+  // Here's where we call the routine that builds all the
+  // objects we'll be drawing.
+
+  function draw() {
+    // Draw the scene
+    drawScene(gl, programInfo);
+  }
+
+  setInterval(draw, 10000);
+  draw()
+}
