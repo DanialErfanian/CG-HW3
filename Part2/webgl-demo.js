@@ -1,5 +1,5 @@
-let Px = [-1, -1, 1, 1];
-let Py = [-1, 1, -1, 1];
+let Px = [];
+let Py = [];
 const degree = 3
 const internalKnots = []
 let knots = []
@@ -82,10 +82,12 @@ function main() {
 
     const pos = getNoPaddingNoBorderCanvasRelativeMousePosition(e, gl.canvas);
     console.log(pos)
-    if (internalKnots.length > 0) {
-      internalKnots.push(internalKnots[internalKnots.length - 1])
-    } else {
-      internalKnots.push(0.5)
+    if (Px.length >= degree + 1) {
+      if (internalKnots.length > 0) {
+        internalKnots.push(internalKnots[internalKnots.length - 1])
+      } else {
+        internalKnots.push(0.5)
+      }
     }
     console.log("Dastan:")
     resetKnots()
@@ -180,6 +182,8 @@ function N(i, j, t) {
 
 function f(t, points) {
   const n = points.length - 1
+  if (n < degree)
+    return 0
   const m = knots.length - 1
   const p = m - n - 1
   console.assert(p === degree)
