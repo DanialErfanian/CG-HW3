@@ -1,6 +1,26 @@
 let Px = [-1, -1, 1, 1];
 let Py = [-1, 1, -1, 1];
+let C = []
 const vertexCount = 100;
+
+function createC() {
+  const MAX_POINTS = 20;
+  for (let i = 0; i <= MAX_POINTS; i++)
+    C.push([])
+  for (let i = 0; i <= MAX_POINTS; i++)
+    for (let j = 0; j <= MAX_POINTS; j++)
+      C[i].push(j)
+
+  for (let i = 1; i <= MAX_POINTS; i++)
+    C[i][0] = 1
+  for (let i = 1; i <= MAX_POINTS; i++)
+    C[i][i] = 1
+  for (let i = 2; i <= MAX_POINTS; i++)
+    for (let j = 1; j < i; j++)
+      C[i][j] = C[i - 1][j - 1] + C[i - 1][j]
+}
+
+createC();
 
 main();
 
@@ -38,10 +58,6 @@ function main() {
 
     const pos = getNoPaddingNoBorderCanvasRelativeMousePosition(e, gl.canvas);
     console.log(pos)
-    if (Px.length === 4) {
-      Px = []
-      Py = []
-    }
     Px.push(pos.x)
     Py.push(pos.y)
   })
@@ -109,43 +125,22 @@ function main() {
 //
 // Initialize the buffers we'll need. For this demo, we just
 function f(t, points) {
-  return Math.pow(1 - t, 3) * points[0] +
-    3 * t * Math.pow(1 - t, 2) * points[1] +
-    3 * t * t * (1 - t) * points[2] +
-    t * t * t * points[3]
+  if (points.length < 4)
+    return 0
+  let n = points.length - 1
+  let sum = 0
+  for (let i = 0; i <= n; i++) {
+    sum += C[n][i] * Math.pow(1 - t, n - i) * Math.pow(t, i) * points[i]
+  }
+  return sum
 }
 
 // have one object -- a simple two-dimensional square.
 function createPosition() {
-  let Tx, Ty
-  switch (Px.length) {
-    case 0:
-      Tx = [0, 0, 0, 0]
-      Ty = [0, 0, 0, 0]
-      break;
-    case 1:
-      Tx = [Px[0], Px[0] + 0.2, Px[0], Px[0]]
-      Ty = [Py[0], Py[0], Py[0] + 0.2, Py[0]]
-
-      break;
-    case 2:
-      Tx = [Px[0], Px[1], Px[1], Px[1]]
-      Ty = [Py[0], Py[1], Py[1], Py[1]]
-      break;
-    case 3:
-      Tx = [Px[0], Px[1], Px[2], Px[2]]
-      Ty = [Py[0], Py[1], Py[2], Py[2]]
-      break;
-    default:
-      Tx = Px
-      Ty = Py
-      break;
-  }
-  console.log(Tx, Ty)
   const positions = [];
   for (let t = 0.0; t <= 1; t += 0.01) {
-    positions.push(f(t, Tx))
-    positions.push(f(t, Ty))
+    positions.push(f(t, Px))
+    positions.push(f(t, Py))
   }
   return positions;
 }
