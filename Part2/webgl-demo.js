@@ -1,7 +1,23 @@
 let Px = [-1, -1, 1, 1];
 let Py = [-1, 1, -1, 1];
+const degree = 3
 const internalKnots = []
-let knots = [...[0, 0, 0, 0], ...internalKnots, ...[1, 1, 1, 1]]
+let knots = []
+
+function resetKnots() {
+  knots = []
+  for (let i = 0; i < degree + 1; i++) {
+    knots.push(0)
+  }
+  for (let i = 0; i < internalKnots.length; i++) {
+    knots.push(internalKnots[i])
+  }
+  for (let i = 0; i < degree + 1; i++) {
+    knots.push(1)
+  }
+}
+
+resetKnots()
 const vertexCount = 100;
 
 main();
@@ -31,10 +47,12 @@ function getNoPaddingNoBorderCanvasRelativeMousePosition(event, target) {
 
 
 function reloadSliders() {
+  document.getElementById("debug-data").innerText = `Px=${Px} Py=${Py} Knots=${knots}`
+
   let elem = document.getElementById("knot")
   elem.innerHTML = ''
   for (let i = 0; i < knots.length; i++) {
-    let disabled = Math.min(i, knots.length - i - 1) < 4
+    let disabled = Math.min(i, knots.length - i - 1) <= degree
     let child = document.createElement("div")
     child.innerHTML = `
         <label for=\"myRange\">Knot ${i}: </label>
@@ -43,8 +61,8 @@ function reloadSliders() {
       console.log(`knots-${i} - ${event.target.value}`)
       let value = Number(event.target.value) / 100
       if (knots[i - 1] < value && value < knots[i + 1]) {
-        knots[i] = value
-        internalKnots[i - 4] = value
+        internalKnots[i - degree - 1] = value
+        resetKnots()
       } else {
         event.target.value = knots[i] * 100
       }
@@ -70,8 +88,7 @@ function main() {
       internalKnots.push(0.5)
     }
     console.log("Dastan:")
-    console.log(internalKnots)
-    knots = [...[0, 0, 0, 0], ...internalKnots, ...[1, 1, 1, 1]]
+    resetKnots()
     console.log(internalKnots)
     console.log(knots)
     Px.push(pos.x)
@@ -131,7 +148,6 @@ function main() {
   function draw() {
     const buffers = initBuffers(gl);
 
-    document.getElementById("debug-data").innerText = `Px=${Px} Py=${Py} Knots=${knots}`
     // Draw the scene
     drawScene(gl, programInfo, buffers);
   }
@@ -166,7 +182,7 @@ function f(t, points) {
   const n = points.length - 1
   const m = knots.length - 1
   const p = m - n - 1
-  console.assert(p === 3)
+  console.assert(p === degree)
   let sum = 0
   for (let i = 0; i < points.length; i++) {
     sum += points[i] * N(i, p, t)
