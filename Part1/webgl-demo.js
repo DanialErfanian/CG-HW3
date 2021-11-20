@@ -1,5 +1,5 @@
-let Px = [-1, -1, 1, 1];
-let Py = [-1, 1, -1, 1];
+let Px = []//-1, -1, 1, 1];
+let Py = []//-1, 1, -1, 1];
 let C = []
 const vertexCount = 100;
 
@@ -90,6 +90,19 @@ function main() {
     }
   `;
 
+  const shaderProgram2 = initShaderProgram(gl, vsSource, fsSource);
+  const programInfo2 = {
+    program: shaderProgram2,
+    attribLocations: {
+      vertexPosition: gl.getAttribLocation(shaderProgram2, 'aVertexPosition'),
+    },
+    uniformLocations: {
+      projectionMatrix: gl.getUniformLocation(shaderProgram2, 'uProjectionMatrix'),
+      modelViewMatrix: gl.getUniformLocation(shaderProgram2, 'uModelViewMatrix'),
+    },
+  };
+
+
   // Initialize a shader program; this is where all the lighting
   // for the vertices and so forth is established.
   const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
@@ -110,12 +123,25 @@ function main() {
 
   // Here's where we call the routine that builds all the
   // objects we'll be drawing.
-
+  const positionBuffer = gl.createBuffer();
+  const positionBuffer2 = gl.createBuffer();
   setInterval(function () {
-    const buffers = initBuffers(gl);
-    // Draw the scene
-    drawScene(gl, programInfo, buffers);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    const positions = createPosition();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER,
+      new Float32Array(positions),
+      gl.STATIC_DRAW);
+    drawScene(gl, programInfo, positionBuffer, gl.LINE_STRIP, vertexCount);
+
+
+    const positions2 = createControlPoints();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer2);
+    gl.bufferData(gl.ARRAY_BUFFER,
+      new Float32Array(positions2),
+      gl.STATIC_DRAW);
+    drawScene(gl, programInfo2, positionBuffer2, gl.TRIANGLES, positions2.length);
   }, 100);
 
 }
@@ -145,39 +171,30 @@ function createPosition() {
   return positions;
 }
 
-//
-function initBuffers(gl) {
+function createControlPoints() {
+  const result = [];
+  for (let i = 0; i < Px.length; i++) {
+    const x = Px[i];
+    const y = Py[i];
+    const s = 0.02;
+    // x-0.01, x+0.01
+    // y-0.01, y+0.01
+    result.push(x-s, y-s)
+    result.push(x-s, y+s)
+    result.push(x+s, y+s)
 
-  // Create a buffer for the square's positions.
-
-  const positionBuffer = gl.createBuffer();
-
-  // Select the positionBuffer as the one to apply buffer
-  // operations to from here out.
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-  // Now create an array of positions for the square.
-
-  const positions = createPosition();
-
-  // Now pass the list of positions into WebGL to build the
-  // shape. We do this by creating a Float32Array from the
-  // JavaScript array, then use it to fill the current buffer.
-
-  gl.bufferData(gl.ARRAY_BUFFER,
-    new Float32Array(positions),
-    gl.STATIC_DRAW);
-
-  return {
-    position: positionBuffer,
-  };
+    result.push(x-s, y-s)
+    result.push(x+s, y-s)
+    result.push(x+s, y+s)
+  }
+  return result
 }
 
 //
+//
 // Draw the scene.
 //
-function drawScene(gl, programInfo, buffers) {
+function drawScene(gl, programInfo, position, drawMode, count) {
   gl.clearColor(1.0, 1.0, 1.0, 1.0);  // Clear to black, fully opaque
   gl.clearColor(1.0, 1.0, 1.0, 1.0);  // Clear to black, fully opaque
   gl.clearDepth(1.0);                 // Clear everything
@@ -186,7 +203,7 @@ function drawScene(gl, programInfo, buffers) {
 
   // Clear the canvas before we start drawing on it.
 
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   // Create a perspective matrix, a special matrix that is
   // used to simulate the distortion of perspective in a camera.
@@ -228,7 +245,7 @@ function drawScene(gl, programInfo, buffers) {
     const normalize = false;
     const stride = 0;
     const offset = 0;
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+    gl.bindBuffer(gl.ARRAY_BUFFER, position);
     gl.vertexAttribPointer(
       programInfo.attribLocations.vertexPosition,
       numComponents,
@@ -257,7 +274,7 @@ function drawScene(gl, programInfo, buffers) {
 
   {
     const offset = 0;
-    gl.drawArrays(gl.LINE_STRIP, offset, vertexCount);
+    gl.drawArrays(drawMode, offset, count);
   }
 }
 
