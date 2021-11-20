@@ -1,13 +1,14 @@
+let at = [0.0, 0.0, 0.0]
+let eye = [1.0, 1.0, 1.0]
+let up = [0.0, 1.0, 0.0]
+
 let grid_size = 20
 let Positions = [
   [
-    [0, 0, 0], [-1, 0, 0],
+    [0, 0, 0], [0, -1, 0], [0, -1, -1], 
   ], 
   [
-    [0, -1, 0], [-1, -1, 0],
-  ],
-  [
-    [0, -1, -1], [-1, -1, -1],
+    [-1, 0, 0], [-1, -1, 0], [-1, -1, -1],
   ]
 ];
 
@@ -78,11 +79,32 @@ function makeTriangles(P) {
   return triangle
 }
 
+function lookAt(eye, at, up) {
+  zaxis = (at - eye).normalized
+  xaxis = (up * zaxis).normalized
+  yaxis = zaxis * xaxis
+
+  const mat1 = [
+    [xaxis[0],  xaxis[1],  xaxis[2], 0.0],
+    [yaxis[0],  yaxis[1],  yaxis[2], 0.0],
+    [zaxis[0],  zaxis[1],  zaxis[2], 0.0],
+    [0.0, 0.0, 0.0, 1.0],
+  ]
+  const mat2 = [
+    [1.0, 0.0, 0.0, -eye[0]],
+    [0.0, 1.0, 0.0, -eye[1]],
+    [0.0, 0.0, 1.0, -eye[2]],
+    [0.0, 0.0, 0.0, 1.0],
+  ]
+ 
+  return mat1 * mat2
+}
+
 //
 // Draw the scene.
 //
 function drawScene(gl, programInfo) {
-  // gl.clearColor(1.0, 1.0, 1.0, 1.0);  // Clear to black, fully opaque
+  gl.clearColor(1.0, 1.0, 1.0, 1.0);  // Clear to black, fully opaque
   gl.clearDepth(1.0);                 // Clear everything
   gl.enable(gl.DEPTH_TEST);           // Enable depth testing
   gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
@@ -102,15 +124,17 @@ function drawScene(gl, programInfo) {
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
   const zNear = 0.1;
   const zFar = 100.0;
-  const projectionMatrix = mat4.create();
+  // const projectionMatrix = mat4.create();
 
-  // note: glmatrix.js always has the first argument
-  // as the destination to receive the result.
-  mat4.perspective(projectionMatrix,
-    fieldOfView,
-    aspect,
-    zNear,
-    zFar);
+  // // note: glmatrix.js always has the first argument
+  // // as the destination to receive the result.
+  // mat4.perspective(projectionMatrix,
+  //   fieldOfView,
+  //   aspect,
+  //   zNear,
+  //   zFar);
+
+  const projectionMatrix = mat4.create() // #FIXME
 
   // Set the drawing position to the "identity" point, which is
   // the center of the scene.
@@ -123,7 +147,7 @@ function drawScene(gl, programInfo) {
 
   mat4.translate(modelMatrix,     // destination matrix
     modelMatrix,     // matrix to translate
-    [-0.0, 0.0, -0.0]);  // amount to translate
+    [-0.0, 0.0, -10.0]);  // amount to translate
 
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute.
@@ -136,11 +160,17 @@ function drawScene(gl, programInfo) {
     // operations to from here out.
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    if (!positionBuffer) {
+      console.log('Failed to create the buffer object');
+    }
 
     // Now create an array of positions for the square.
 
-    const positions = makePositions(Positions);
-    const triangles = makeTriangles(Positions);
+    // const positions = makePositions(Positions);
+    // const triangles = makeTriangles(Positions);
+    
+    const positions = Positions[0]
+    const triangles = [0, 1, 2];
     // console.log(positions)
     // console.log(triangles)
 
@@ -167,6 +197,9 @@ function drawScene(gl, programInfo) {
       programInfo.attribLocations.vertexPosition);
 
     const elementBuffer = gl.createBuffer();
+    if (!elementBuffer) {
+      console.log('Failed to create the buffer object');
+    }
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elementBuffer);  
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triangles), gl.STATIC_DRAW);
 
@@ -198,7 +231,10 @@ function drawScene(gl, programInfo) {
 
   {
     const offset = 0;
-    gl.drawElements(gl.TRIANGLES, (grid_size-1)*(grid_size-1)*6, gl.UNSIGNED_BYTE, offset);
+    gl.drawElements(gl.TRIANGLES,
+      3,
+      //  (grid_size-1)*(grid_size-1)*6, 
+       gl.UNSIGNED_SHORT, offset);
   }
 }
 
